@@ -9,7 +9,7 @@ function App() {
 
   const handleReview = async () => {
     try {
-      const res = await axios.post("https://ai-code-reviewer-backend-dpgl.onrender.com/", { code, language });
+      const res = await axios.post("https://ai-code-reviewer-backend-dpgl.onrender.com/review", { code, language });
       if (res.data && res.data.review) {
         const lines = res.data.review.split("\n");
         setReview(lines);
