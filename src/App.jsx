@@ -9,7 +9,7 @@ function App() {
 
   const handleReview = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/review", { code, language });
+      const res = await axios.post("https://ai-code-reviewer-backend-dpgl.onrender.com/", { code, language });
       if (res.data && res.data.review) {
         const lines = res.data.review.split("\n");
         setReview(lines);
@@ -146,10 +146,3 @@ function App() {
 export default App;
 
 
-const backendUrl = "https://code-reviewer-backend-v239.onrender.com";
-
-const response = await fetch(`${backendUrl}/review`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ code, language }),
-});
