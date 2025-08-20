@@ -1,24 +1,45 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Copy } from "lucide-react";
 
 function App() {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("python");
-  const [review, setReview] = useState([]);
+  const [review, setReview] = useState("");
+  const [fixedCode, setFixedCode] = useState(""); // ✅ Extracted code only
+  const [copied, setCopied] = useState(false);
   const reviewEndRef = useRef(null);
 
   const handleReview = async () => {
     try {
-      const res = await axios.post("https://ai-code-reviewer-backend-dpgl.onrender.com/review", { code, language });
+      const res = await axios.post("https://ai-code-reviewer-backend-dpgl.onrender.com/review", {
+        code,
+        language,
+      });
+
       if (res.data && res.data.review) {
-        const lines = res.data.review.split("\n");
-        setReview(lines);
+        const reviewText = res.data.review;
+        setReview(reviewText);
+
+        // ✅ Extract first code block from markdown ``` ```
+        const codeMatch = reviewText.match(/```[\s\S]*?```/);
+        if (codeMatch) {
+          const cleanCode = codeMatch[0]
+            .replace(/```[a-zA-Z]*/g, "")
+            .replace(/```/g, "")
+            .trim();
+          setFixedCode(cleanCode);
+        } else {
+          setFixedCode("");
+        }
       } else {
-        setReview(["No review returned from Gemini."]);
+        setReview("No review returned from Gemini.");
       }
     } catch (err) {
       console.error("Error fetching review:", err);
-      setReview([err.response?.data?.error || "Error fetching review."]);
+      setReview(err.response?.data?.error || "Error fetching review.");
     }
   };
 
@@ -27,7 +48,8 @@ function App() {
       e.preventDefault();
       const start = e.target.selectionStart;
       const end = e.target.selectionEnd;
-      const newCode = code.substring(0, start) + "    " + code.substring(end);
+      const newCode =
+        code.substring(0, start) + "    " + code.substring(end);
       setCode(newCode);
       setTimeout(() => {
         e.target.selectionStart = e.target.selectionEnd = start + 4;
@@ -35,39 +57,11 @@ function App() {
     }
   };
 
-  const renderLineWithIcon = (line, index) => {
-    const trimmed = line.trim().toLowerCase();
-    let style = {
-      color: "#ffffff",
-      marginBottom: "4px",
-      padding: "2px 4px",
-      display: "block",
-      background: index % 2 === 0 ? "#111111" : "#1a1a1a",
-      borderRadius: "3px",
-    };
-    let icon = "";
-
-    if (trimmed.startsWith("error") || trimmed.startsWith("problem") || trimmed.startsWith("issue")) {
-      style.color = "#ff5555";
-      icon = "❌ ";
-    } else if (
-      trimmed.startsWith("solution") ||
-      trimmed.startsWith("fix") ||
-      trimmed.startsWith("recommendation") ||
-      trimmed.startsWith("improvement")
-    ) {
-      style.color = "#00ff00";
-      icon = "✅ ";
-    } else if (trimmed.startsWith("tip") || trimmed.startsWith("note")) {
-      style.color = "#ffff55";
-      icon = "💡 ";
-    }
-
-    return (
-      <span style={style}>
-        {icon}{line}
-      </span>
-    );
+  const handleCopy = () => {
+    if (!fixedCode) return;
+    navigator.clipboard.writeText(fixedCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // Auto-scroll to bottom when review updates
@@ -76,11 +70,28 @@ function App() {
   }, [review]);
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "Arial, sans-serif", background: "#121212" }}>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        fontFamily: "Arial, sans-serif",
+        background: "#121212",
+      }}
+    >
       {/* Code Input */}
-      <div style={{ flex: 1, padding: "20px", background: "#1e1e1e", color: "white" }}>
+      <div
+        style={{
+          flex: 1,
+          padding: "20px",
+          background: "#1e1e1e",
+          color: "white",
+        }}
+      >
         <h2>Write your code</h2>
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+        >
           <option value="python">Python</option>
           <option value="javascript">JavaScript</option>
           <option value="c">C</option>
@@ -97,7 +108,7 @@ function App() {
             fontFamily: "monospace",
             borderRadius: "5px",
             padding: "8px",
-            resize: "none",
+            resize: "both", // ✅ resizable
           }}
           value={code}
           onChange={(e) => setCode(e.target.value)}
@@ -129,20 +140,45 @@ function App() {
           overflowY: "auto",
           lineHeight: "1.6",
           fontFamily: "monospace",
+          position: "relative",
         }}
       >
-        <h2>Code Review</h2>
-        <div>
-          {review.map((line, index) => (
-            <React.Fragment key={index}>{renderLineWithIcon(line, index)}</React.Fragment>
-          ))}
-          <div ref={reviewEndRef} />
-        </div>
+        <h2 style={{ display: "flex", alignItems: "center" }}>
+          Code Review
+        </h2>
+
+        {/* Render raw review */}
+        <div style={{ whiteSpace: "pre-wrap" }}>{review}</div>
+
+        {/* Show extracted code block with highlighting + copy */}
+        {fixedCode && (
+          <div style={{ marginTop: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <h3 style={{ marginRight: "10px" }}>Suggested Fix:</h3>
+              <button
+                onClick={handleCopy}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  background: "#333",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <Copy size={16} /> {copied ? "Copied!" : "Copy Fix"}
+              </button>
+            </div>
+            <SyntaxHighlighter language={language} style={oneDark}>
+              {fixedCode}
+            </SyntaxHighlighter>
+          </div>
+        )}
+
+        <div ref={reviewEndRef} />
       </div>
     </div>
   );
 }
 
 export default App;
-
-
